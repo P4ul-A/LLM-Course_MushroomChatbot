@@ -19,8 +19,14 @@ from transformers import (
 )
 
 
-MODEL_NAME = "Qwen/Qwen3.5-2B"
+# MODEL_NAME = "Qwen/Qwen3.5-2B"
+# MODEL_NAME = "Qwen/Qwen3.5-0.8B"
+MODEL_NAME = "HuggingFaceTB/SmolVLM-256M-Instruct"
 DEVICE = "mps" if platform.system() == "Darwin" else "auto"
+GENERATION_CONFIG = {
+    "do_sample": True,
+    "temperature": 0.7,
+}
 APP_DIR = Path(__file__).resolve().parent
 INSTRUCTIONS = (APP_DIR / "instructions.txt").read_text(encoding="utf-8")
 
@@ -42,6 +48,7 @@ FOREST_THEME = gr.themes.Soft(
 # A strong overlay keeps the photograph subtle and the chat easy to read.
 BACKGROUND_CSS = """
 .gradio-container {
+    min-height: 100dvh;
     background-image:
         linear-gradient(rgba(244, 249, 244, 0.92), rgba(235, 244, 237, 0.92)),
         url('/gradio_api/file=assets/background.jpeg');
@@ -92,7 +99,7 @@ def prepare(conversation):
 
 
 def generate(conversation, max_new_tokens=512):
-    """Generate one complete deterministic answer.
+    """Generate one complete answer.
 
     Parameters:
         conversation: Messages in the Hugging Face chat format.
@@ -104,7 +111,7 @@ def generate(conversation, max_new_tokens=512):
     inputs = prepare(conversation)
     output_ids = model.generate(
         **inputs,
-        do_sample=False,  # temperature 0: make repeated predictions more consistent
+        **GENERATION_CONFIG,
         max_new_tokens=max_new_tokens,
     )
     answer_ids = output_ids[0, inputs["input_ids"].shape[-1] :]
@@ -112,7 +119,7 @@ def generate(conversation, max_new_tokens=512):
 
 
 def stream(conversation):
-    """Yield a deterministic answer as text chunks are generated.
+    """Yield an answer as text chunks are generated.
 
     Parameters:
         conversation: Messages in the Hugging Face chat format.
@@ -134,7 +141,7 @@ def stream(conversation):
             model.generate(
                 **inputs,
                 streamer=streamer,
-                do_sample=False,
+                **GENERATION_CONFIG,
                 max_new_tokens=1024,
             )
         except Exception as error:  # forward background errors to Gradio
@@ -283,7 +290,7 @@ def chat(message, history, private_history):
     yield answer, conversation
 
 
-with gr.Blocks() as demo:
+with gr.Blocks(fill_height=True, fill_width=True) as demo:
     private_history = gr.State([])
     gr.ChatInterface(
         fn=chat,
@@ -291,12 +298,14 @@ with gr.Blocks() as demo:
         textbox=gr.MultimodalTextbox(
             file_count="single",
             file_types=["image"],
-            placeholder="Ask about mushrooms or upload a mushroom image",
+            placeholder="Ask Mushy, your local mushroom expert, a question or upload one image.",
         ),
         additional_inputs=[private_history],
         additional_outputs=[private_history],
-        title="Mushroom Chatbot",
-        description="Ask the local mushroom expert a question or upload one image.",
+        title="Mushy Chatbot",
+        description="Ask Mushy, your local mushroom expert, a question or upload one image.",
+        fill_height=True,
+        fill_width=True,
         run_examples_on_click=True,
         examples=[
             [{"text": "List the most common mushrooms in Sweden", "files": []}, None],
